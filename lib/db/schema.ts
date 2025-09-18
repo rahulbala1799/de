@@ -1,8 +1,8 @@
-import { sqliteTable, text, integer, real, blob } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, real, boolean, timestamp, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Restaurants table (tenant isolation)
-export const restaurants = sqliteTable('restaurants', {
+export const restaurants = pgTable('restaurants', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
@@ -11,113 +11,93 @@ export const restaurants = sqliteTable('restaurants', {
   phone: text('phone'),
   email: text('email'),
   logo: text('logo'),
-  theme: text('theme', { mode: 'json' }).$type<{
-    primaryColor: string;
-    secondaryColor: string;
-    fontFamily: string;
-  }>(),
-  isActive: integer('is_active', { mode: 'boolean' }).default(true),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  theme: text('theme'), // JSON string for theme customization
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Users table (with restaurant association)
-export const users = sqliteTable('users', {
+// Users table (admin, restaurant owners, staff)
+export const users = pgTable('users', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text('email').notNull().unique(),
   password: text('password').notNull(),
   name: text('name').notNull(),
-  role: text('role', { enum: ['admin', 'restaurant_owner', 'staff'] }).notNull().default('restaurant_owner'),
+  role: text('role').notNull().$type<'admin' | 'restaurant_owner' | 'staff'>(),
   restaurantId: text('restaurant_id').references(() => restaurants.id),
-  isActive: integer('is_active', { mode: 'boolean' }).default(true),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Menu categories
-export const categories = sqliteTable('categories', {
+// Categories table
+export const categories = pgTable('categories', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text('name').notNull(),
   description: text('description'),
   restaurantId: text('restaurant_id').notNull().references(() => restaurants.id),
   sortOrder: integer('sort_order').default(0),
-  isActive: integer('is_active', { mode: 'boolean' }).default(true),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Menu items
-export const menuItems = sqliteTable('menu_items', {
+// Menu items table
+export const menuItems = pgTable('menu_items', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text('name').notNull(),
   description: text('description'),
   price: real('price').notNull(),
   image: text('image'),
-  category: text('category', { enum: ['burger', 'pizza', 'fried_chicken', 'beverage', 'side', 'dessert'] }).notNull(),
+  category: text('category').notNull(), // burger, pizza, fried_chicken, etc.
   categoryId: text('category_id').references(() => categories.id),
   restaurantId: text('restaurant_id').notNull().references(() => restaurants.id),
-  isAvailable: integer('is_available', { mode: 'boolean' }).default(true),
-  isPopular: integer('is_popular', { mode: 'boolean' }).default(false),
-  allergens: text('allergens', { mode: 'json' }).$type<string[]>(),
-  nutritionInfo: text('nutrition_info', { mode: 'json' }).$type<{
-    calories?: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
-  }>(),
-  customizations: text('customizations', { mode: 'json' }).$type<{
-    name: string;
-    type: 'single' | 'multiple';
-    required: boolean;
-    options: {
-      name: string;
-      price: number;
-    }[];
-  }[]>(),
+  isAvailable: boolean('is_available').default(true),
+  isPopular: boolean('is_popular').default(false),
+  allergens: text('allergens'), // JSON string
+  nutritionInfo: text('nutrition_info'), // JSON string
+  customizations: text('customizations'), // JSON string for customization options
   sortOrder: integer('sort_order').default(0),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Tables (for QR code generation)
-export const tables = sqliteTable('tables', {
+// Tables table (for QR codes)
+export const tables = pgTable('tables', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   number: text('number').notNull(),
   qrCode: text('qr_code').notNull().unique(),
   restaurantId: text('restaurant_id').notNull().references(() => restaurants.id),
-  isActive: integer('is_active', { mode: 'boolean' }).default(true),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Orders
-export const orders = sqliteTable('orders', {
+// Orders table
+export const orders = pgTable('orders', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   orderNumber: text('order_number').notNull(),
   tableId: text('table_id').notNull().references(() => tables.id),
   restaurantId: text('restaurant_id').notNull().references(() => restaurants.id),
   customerName: text('customer_name'),
   customerPhone: text('customer_phone'),
-  status: text('status', { enum: ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'] }).default('pending'),
+  status: text('status').default('pending').$type<'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled'>(),
   totalAmount: real('total_amount').notNull(),
   notes: text('notes'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Order items
-export const orderItems = sqliteTable('order_items', {
+// Order items table
+export const orderItems = pgTable('order_items', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   orderId: text('order_id').notNull().references(() => orders.id),
   menuItemId: text('menu_item_id').notNull().references(() => menuItems.id),
   quantity: integer('quantity').notNull().default(1),
   unitPrice: real('unit_price').notNull(),
-  customizations: text('customizations', { mode: 'json' }).$type<{
-    name: string;
-    options: string[];
-  }[]>(),
+  customizations: text('customizations'), // JSON string
   notes: text('notes'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at').defaultNow(),
 });
 
 // Relations
