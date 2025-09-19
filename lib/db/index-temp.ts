@@ -1,5 +1,5 @@
-// Temporary mock database for initial deployment
-// Will be replaced with actual database connection later
+// Temporary database connection for initial deployment
+// This will be replaced with actual database connection later
 
 export const db = {
   // Mock database object for initial deployment
